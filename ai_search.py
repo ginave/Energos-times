@@ -1,17 +1,114 @@
-import os, requests
+import os
+import json
+import re
+import requests
+
 from energy_catalog import EnergyDrink
-SEARX="https://searx.be/search"
-OR="https://openrouter.ai/api/v1/chat/completions"
-def ai_search_energy(q:str):
- k=os.getenv("OPENROUTER_API_KEY")
- try:
-  r=requests.get(SEARX,params={"q":q+" energy drink caffeine taurine volume","format":"json"},timeout=12).json()
-  txt="\n".join([f"{x.get('title')}\n{x.get('content')}" for x in r.get('results',[])[:5]])
-  if not k or not txt:return None
-  p=f"Extract JSON: name,brand,quantity,caffeine_mg,taurine_mg from: {txt}"
-  j=requests.post(OR,headers={"Authorization":f"Bearer {k}"},json={"model":"google/gemma-3-27b-it:free","messages":[{"role":"user","content":p}]},timeout=25).json()
-  import json,re
-  m=re.search(r"\{.*\}",j["choices"][0]["message"]["content"],re.S)
-  d=json.loads(m.group())
-  return EnergyDrink(code="ai-"+q,name=d["name"],brand=d.get("brand","?"),quantity=d.get("quantity","?"),caffeine_mg=float(d["caffeine_mg"]),taurine_mg=float(d["taurine_mg"]),source_url=SEARX)
- except:return None
+
+SEARX = "https://searx.be/search"
+OR = "https://openrouter.ai/api/v1/chat/completions"
+
+
+def ai_search_energy(q: str):
+    try:
+        print("AI SEARCH:", q)
+
+        key = os.getenv("OPENROUTER_API_KEY")
+
+        if not key:
+            print("ERROR: OPENROUTER_API_KEY not found")
+            return None
+
+        print("Searching SearX...")
+
+        response = requests.get(
+            SEARX,
+            params={
+                "q": q + " energy drink caffeine taurine volume",
+                "format": "json"
+            },
+            timeout=12
+        )
+
+        print("SearX status:", response.status_code)
+
+        data = response.json()
+
+        results = data.get("results", [])
+
+        if not results:
+            print("No search results")
+            return None
+
+        text = "\n".join(
+            [
+                f"{x.get('title','')}\n{x.get('content','')}"
+                for x in results[:5]
+            ]
+        )
+
+        prompt = f"""
+Extract JSON from this information.
+
+Return ONLY:
+{{
+"name":"",
+"brand":"",
+"quantity":"",
+"caffeine_mg":0,
+"taurine_mg":0
+}}
+
+Information:
+{text}
+"""
+
+        print("Sending request to OpenRouter...")
+
+        ai = requests.post(
+            OR,
+            headers={
+                "Authorization": f"Bearer {key}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "google/gemma-3-27b-it:free",
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ]
+            },
+            timeout=30
+        )
+
+        print("OpenRouter status:", ai.status_code)
+
+        result = ai.json()
+
+        content = result["choices"][0]["message"]["content"]
+
+        print("AI answer:", content)
+
+        match = re.search(r"\{.*\}", content, re.S)
+
+        if not match:
+            print("JSON not found")
+            return None
+
+        item = json.loads(match.group())
+
+        return EnergyDrink(
+            code="ai-" + q,
+            name=item.get("name", q),
+            brand=item.get("brand", "?"),
+            quantity=item.get("quantity", "?"),
+            caffeine_mg=float(item.get("caffeine_mg", 0)),
+            taurine_mg=float(item.get("taurine_mg", 0)),
+            source_url=SEARX
+        )
+
+    except Exception as e:
+        print("AI ERROR:", repr(e))
+        return None
