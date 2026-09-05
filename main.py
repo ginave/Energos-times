@@ -743,7 +743,7 @@ except Exception as e:
 
 if drink is None:
     print("Trying AI search...")
-    drink = ai_search_energy(query)
+    drink = drink = ai_search_energy(search_query)
 def process_energy_query(chat_id: int, query: str) -> None:
     search_query, _, _ = normalize_with_gemini(query)
 
