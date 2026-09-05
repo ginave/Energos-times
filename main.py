@@ -735,7 +735,15 @@ def is_energy_query(message: types.Message) -> bool:
     }
     return bool(text) and not text.startswith("/") and text not in buttons
 
+try:
+    drink = search_energy_drink(search_query)
+except Exception as e:
+    print("CATALOG ERROR:", e)
+    drink = None
 
+if drink is None:
+    print("Trying AI search...")
+    drink = ai_search_energy(query)
 def process_energy_query(chat_id: int, query: str) -> None:
     search_query, _, _ = normalize_with_gemini(query)
 
