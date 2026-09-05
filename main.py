@@ -734,7 +734,31 @@ def is_energy_query(message: types.Message) -> bool:
         REMOVE_ENERGY_BUTTON,
     }
     return bool(text) and not text.startswith("/") and text not in buttons
+def process_energy_query(chat_id: int, query: str) -> None:
+    search_query, _, _ = normalize_with_gemini(query)
 
+    try:
+        drink = search_energy_drink(search_query)
+    except Exception as e:
+        print("CATALOG ERROR:", e)
+        drink = None
+
+    if drink is None:
+        print("Trying AI search...")
+        drink = ai_search_energy(query)
+
+    if drink is None:
+        bot.send_message(
+            chat_id,
+            "Не удалось найти продукт."
+        )
+        return
+
+    bot.send_message(
+        chat_id,
+        drink_details(drink),
+        parse_mode="HTML"
+    )
 try:
     drink = search_energy_drink(search_query)
 except Exception as e:
@@ -744,7 +768,7 @@ except Exception as e:
 if drink is None:
     print("Trying AI search...")
     drink = drink = ai_search_energy(search_query)
-def process_energy_query(chat_id: int, query: str) -> None:
+.def process_energy_query(chat_id: int, query: str) -> None:
     search_query, _, _ = normalize_with_gemini(query)
 
     try:
